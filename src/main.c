@@ -231,43 +231,14 @@ int main(void) {
 	isMgba = mgba_open();
 	savprintf("Game Boy Advance Test Suite\n===");
 
-	int suiteIndex = 0;
-	int viewIndex = 0;
+	for (size_t i = 0; i < nSuites; ++i) {
+		activeTestInfo.suiteId = i;
+		debugprintf("BEGIN: %s", suites[i]->name);
+		suites[i]->run();
+		debugprintf("END: %i/%i", *suites[i]->passes, *suites[i]->totalResults);
+	}
+	debugprintf("ALL DONE");
 	while (1) {
-		memset(TEXT_LOC(1, 0), 0, sizeof(textGrid) - GRID_STRIDE);
-		scanKeys();
-		u16 keys = keysDownRepeat();
-
-		if (keys & KEY_A) {
-			activeTestInfo.suiteId = suiteIndex;
-			runSuite(suites[suiteIndex]);
-			activeTestInfo.suiteId = -1;
-			continue;
-		}
-
-		if (keys & KEY_UP) {
-			--suiteIndex;
-			if (suiteIndex < 0) {
-				suiteIndex = nSuites - 1;
-			}
-		}
-		if (keys & KEY_DOWN) {
-			++suiteIndex;
-			suiteIndex %= nSuites;
-		}
-		if (suiteIndex < viewIndex) {
-			viewIndex = suiteIndex;
-		} else if (suiteIndex >= viewIndex + VIEW_SIZE) {
-			viewIndex = suiteIndex - VIEW_SIZE + 1;
-		}
-		clearAll();
-		strcpy(TEXT_LOC(1, 0), "Select suite");
-		size_t i;
-		for (i = 0; i < nSuites && i < VIEW_SIZE; ++i) {
-			snprintf(TEXT_LOC(i + 3, 0), 31, "%c%s", (i + viewIndex == suiteIndex) ? '>' : ' ', suites[i]->name);
-		}
-
-		updateTextGrid();
 		VBlankIntrWait();
 	}
 
