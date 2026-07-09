@@ -238,6 +238,12 @@ int main(void) {
 
 	for (size_t i = 0; i < nSuites; ++i) {
 		activeTestInfo.suiteId = i;
+		if (!suites[i]->run) {
+			// Interactive-only suites (e.g. video tests) have no automated
+			// runner; calling the NULL pointer jumps into the BIOS and hangs
+			debugprintf("SKIP: %s", suites[i]->name);
+			continue;
+		}
 		debugprintf("BEGIN: %s", suites[i]->name);
 		suites[i]->run();
 		debugprintf("END: %i/%i", *suites[i]->passes, *suites[i]->totalResults);
