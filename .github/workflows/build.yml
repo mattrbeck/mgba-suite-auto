@@ -73,8 +73,10 @@ jobs:
 
           # Recreate rather than upload, so the `latest` tag tracks this commit
           gh release delete latest --yes --cleanup-tag || true
+          # Deliberately not --prerelease: GitHub's /releases/latest/ redirect
+          # ignores prereleases, and would otherwise keep serving the old v1.0
           gh release create latest \
             --title "Latest build ($revision)" \
             --notes-file notes.md \
-            --prerelease \
+            --latest \
             deploy/suite.gba "$zip"
