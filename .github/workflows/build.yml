@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to create/update the rolling "latest" release
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # docker-build.sh versions the zip off `git rev-list --count HEAD`,
+          # which needs the full history rather than the default shallow clone
+          fetch-depth: 0
+
+      - name: Build ROM
+        run: ./docker-build.sh
+
+      - name: Stage release assets
+        run: |
+          zip=$(ls deploy/*.zip)
+          # docker-build.sh ends with `make clean`, which removes the loose
+          # suite.gba, so recover it from the zip it just produced
+          unzip -o "$zip" -d deploy
+          {
+            echo "zip=$zip"
+            echo "revision=r$(git rev-list --count HEAD)"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suite-${{ github.sha }}
+          path: |
+            deploy/suite.gba
+            deploy/*.zip
+          if-no-files-found: error
+
+      - name: Publish rolling "latest" release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          Automated build of the latest `master`.
+
+          This fork of the mGBA test suite runs every suite automatically on boot
+          instead of waiting at the menu, and reports results over the mGBA debug
+          channel, so emulators can drive it unattended:
+
+          ```
+          BEGIN: <suite name>
+          END: <passes>/<total>
+          ...
+          SKIP: Video tests
+          ALL DONE
+          ```
+
+          `Video tests` are interactive-only and have no automated runner, so they
+          are skipped rather than run.
+
+          Download `suite.gba` below for the current build.
+          EOF
+          printf '\nCommit: %s (%s)\n' "$GITHUB_SHA" "$revision" >> notes.md
+
+          # Recreate rather than upload, so the `latest` tag tracks this commit
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest \
+            --title "Latest build ($revision)" \
+            --notes-file notes.md \
+            --prerelease \
+            deploy/suite.gba "$zip"
